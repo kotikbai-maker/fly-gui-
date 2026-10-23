@@ -1,0 +1,499 @@
+
+-- language: Luau, file: kismur_fly.lua, target: Roblox client executor
+-- *No fly animations. GUI animations only. English translation.*
+
+local CoreGui      = game:GetService("CoreGui")
+local RunService   = game:GetService("RunService")
+local Players      = game:GetService("Players")
+local Workspace    = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local UserInput    = game:GetService("UserInputService")
+local LocalPlayer  = Players.LocalPlayer
+
+if CoreGui:FindFirstChild("KismurFly") then CoreGui.KismurFly:Destroy() end
+
+-- ============ helpers ============
+local function new(class, props)
+    local inst = Instance.new(class)
+    for k, v in pairs(props or {}) do inst[k] = v end
+    return inst
+end
+local function corner(p, r) new("UICorner", {CornerRadius = UDim.new(0, r or 8), Parent = p}) end
+local function stroke(p, c, t) new("UIStroke", {Color = c or Color3.fromRGB(50,50,60), Thickness = t or 1, Parent = p}) end
+local function grad(p, c1, c2, rot)
+    return new("UIGradient", {Color = ColorSequence.new(c1, c2), Rotation = rot or 0, Parent = p})
+end
+local function rainbowGrad(p)
+    return new("UIGradient", {
+        Color = ColorSequence.new({
+            ColorSequenceKeypoint.new(0.00, Color3.fromRGB(255,  0,  0)),
+            ColorSequenceKeypoint.new(0.17, Color3.fromRGB(255,140,  0)),
+            ColorSequenceKeypoint.new(0.33, Color3.fromRGB(255,255,  0)),
+            ColorSequenceKeypoint.new(0.50, Color3.fromRGB(  0,255,  0)),
+            ColorSequenceKeypoint.new(0.67, Color3.fromRGB(  0,200,255)),
+            ColorSequenceKeypoint.new(0.83, Color3.fromRGB(  0,  0,255)),
+            ColorSequenceKeypoint.new(1.00, Color3.fromRGB(200,  0,255))
+        }),
+        Parent = p
+    })
+end
+
+-- ============ THEMES ============
+local Themes = {
+    Black   = { bg=Color3.fromRGB(10,10,12),  surface=Color3.fromRGB(20,20,24),  element=Color3.fromRGB(28,28,34),  stroke=Color3.fromRGB(45,45,55),   accent=Color3.fromRGB(200,200,220), accent2=Color3.fromRGB(140,140,160), text=Color3.fromRGB(235,235,245), textDim=Color3.fromRGB(140,140,155) },
+    Purple  = { bg=Color3.fromRGB(18,12,28),  surface=Color3.fromRGB(28,20,44),  element=Color3.fromRGB(38,28,58),  stroke=Color3.fromRGB(70,50,110),  accent=Color3.fromRGB(140,80,255),  accent2=Color3.fromRGB(80,160,255),  text=Color3.fromRGB(240,235,255), textDim=Color3.fromRGB(160,150,190) },
+    Crimson = { bg=Color3.fromRGB(18,8,10),   surface=Color3.fromRGB(30,14,18),  element=Color3.fromRGB(42,20,26),  stroke=Color3.fromRGB(80,30,40),   accent=Color3.fromRGB(255,60,90),   accent2=Color3.fromRGB(255,140,60),  text=Color3.fromRGB(255,235,240), textDim=Color3.fromRGB(180,140,150) },
+    Mint    = { bg=Color3.fromRGB(8,18,16),   surface=Color3.fromRGB(16,30,26),  element=Color3.fromRGB(22,42,36),  stroke=Color3.fromRGB(40,80,70),   accent=Color3.fromRGB(60,240,180),  accent2=Color3.fromRGB(80,200,255),  text=Color3.fromRGB(230,255,245), textDim=Color3.fromRGB(140,200,180) },
+}
+local themeOrder = {"Black", "Purple", "Crimson", "Mint"}
+local currentTheme = "Black"
+local T = Themes[currentTheme]
+
+-- ============ ScreenGui ============
+local gui = new("ScreenGui", {
+    Name = "KismurFly", ResetOnSpawn = false,
+    ZIndexBehavior = Enum.ZIndexBehavior.Sibling,
+    IgnoreGuiInset = true, DisplayOrder = 999, Parent = CoreGui
+})
+
+-- ============ Main window ============
+local main = new("Frame", {
+    Size = UDim2.new(0, 0, 0, 0),
+    Position = UDim2.new(0.5, -150, 0.5, -210),
+    BackgroundColor3 = T.bg, BorderSizePixel = 0, Active = true,
+    BackgroundTransparency = 1, Parent = gui
+})
+corner(main, 14)
+local mainStroke = stroke(main, T.stroke, 1)
+
+task.spawn(function()
+    task.wait(0.1)
+    TweenService:Create(main, TweenInfo.new(0.35, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {
+        Size = UDim2.new(0, 300, 0, 420), BackgroundTransparency = 0
+    }):Play()
+end)
+
+local header = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 50),
+    BackgroundColor3 = T.surface, BorderSizePixel = 0, Parent = main
+})
+corner(header, 14)
+new("Frame", {
+    Size = UDim2.new(1,0,0,14), Position = UDim2.new(0,0,1,-14),
+    BackgroundColor3 = T.surface, BorderSizePixel = 0, Parent = header
+})
+local headerGrad = grad(header, T.accent, T.accent2, 90)
+
+local accentLine = new("Frame", {
+    Size = UDim2.new(1, -24, 0, 2), Position = UDim2.new(0, 12, 0, 50),
+    BackgroundColor3 = T.accent, BorderSizePixel = 0, Parent = main
+})
+corner(accentLine, 1)
+local accentLineGrad = grad(accentLine, T.accent, T.accent2, 0)
+
+new("TextLabel", {
+    Size = UDim2.new(1, -100, 1, 0), Position = UDim2.new(0, 16, 0, 0),
+    BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = "KISMUR  FLY",
+    TextSize = 17, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = header
+})
+
+local closeBtn = new("TextButton", {
+    Size = UDim2.new(0, 24, 0, 24), Position = UDim2.new(1, -36, 0.5, -12),
+    BackgroundColor3 = T.element, Font = Enum.Font.GothamBold, Text = "×",
+    TextSize = 16, TextColor3 = T.text, AutoButtonColor = false, Parent = header
+})
+corner(closeBtn, 6)
+stroke(closeBtn, T.stroke, 1)
+closeBtn.MouseEnter:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = Color3.fromRGB(255, 60, 60), TextColor3 = Color3.fromRGB(255,255,255)}):Play()
+end)
+closeBtn.MouseLeave:Connect(function()
+    TweenService:Create(closeBtn, TweenInfo.new(0.15), {BackgroundColor3 = T.element, TextColor3 = T.text}):Play()
+end)
+closeBtn.MouseButton1Click:Connect(function()
+    local tw = TweenService:Create(main, TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.In), {
+        Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1
+    })
+    tw:Play()
+    tw.Completed:Connect(function() gui:Destroy() end)
+end)
+
+-- ============ Page ============
+local page = new("ScrollingFrame", {
+    Size = UDim2.new(1, 0, 1, -110), Position = UDim2.new(0, 0, 0, 62),
+    BackgroundTransparency = 1, BorderSizePixel = 0, ScrollBarThickness = 3,
+    ScrollBarImageColor3 = T.accent, CanvasSize = UDim2.new(0,0,0,0), Parent = main
+})
+local listLayout = new("UIListLayout", {
+    Padding = UDim.new(0, 8), SortOrder = Enum.SortOrder.LayoutOrder,
+    HorizontalAlignment = Enum.HorizontalAlignment.Center, Parent = page
+})
+new("UIPadding", {
+    PaddingTop = UDim.new(0, 8), PaddingLeft = UDim.new(0, 16),
+    PaddingRight = UDim.new(0, 16), PaddingBottom = UDim.new(0, 12), Parent = page
+})
+listLayout:GetPropertyChangedSignal("AbsoluteContentSize"):Connect(function()
+    page.CanvasSize = UDim2.new(0, 0, 0, listLayout.AbsoluteContentSize.Y + 20)
+end)
+
+-- ============ Footer ============
+local footer = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 48), Position = UDim2.new(0, 0, 1, -48),
+    BackgroundTransparency = 1, Parent = main
+})
+local byLabel = new("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 18), Position = UDim2.new(0, 10, 0, 4),
+    BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = "by Kismur_",
+    TextSize = 14, TextColor3 = Color3.fromRGB(255,255,255), Parent = footer
+})
+local byGrad = rainbowGrad(byLabel)
+local tiktokLabel = new("TextLabel", {
+    Size = UDim2.new(1, -20, 0, 16), Position = UDim2.new(0, 10, 0, 22),
+    BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = "TikTok:@kismur4ik_",
+    TextSize = 12, TextColor3 = Color3.fromRGB(255,255,255), Parent = footer
+})
+local tiktokGrad = rainbowGrad(tiktokLabel)
+task.spawn(function()
+    while footer.Parent do
+        byGrad.Rotation = (tick() * 40) % 360
+        tiktokGrad.Rotation = (tick() * 40 + 180) % 360
+        task.wait(0.03)
+    end
+end)
+
+-- ============ Toggle ============
+local toggles = {}
+local function addToggle(text, order, defaultState, onChange)
+    local btn = new("TextButton", {
+        Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = T.element,
+        Font = Enum.Font.Gotham, Text = "", AutoButtonColor = false,
+        LayoutOrder = order, Parent = page
+    })
+    corner(btn, 8)
+    local btnStroke = stroke(btn, T.stroke, 1)
+    new("TextLabel", {
+        Size = UDim2.new(1, -60, 1, 0), Position = UDim2.new(0, 14, 0, 0),
+        BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = text,
+        TextSize = 13, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = btn
+    })
+    local pill = new("Frame", {
+        Size = UDim2.new(0, 40, 0, 20), Position = UDim2.new(1, -54, 0.5, -10),
+        BackgroundColor3 = defaultState and T.accent or T.surface, Parent = btn
+    })
+    corner(pill, 10)
+    local dot = new("Frame", {
+        Size = UDim2.new(0, 16, 0, 16),
+        Position = defaultState and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8),
+        BackgroundColor3 = Color3.fromRGB(255,255,255), Parent = pill
+    })
+    corner(dot, 8)
+    
+    local state = {value = defaultState}
+    local function render(animate)
+        local ti = animate and TweenInfo.new(0.25, Enum.EasingStyle.Back, Enum.EasingDirection.Out) or TweenInfo.new(0)
+        TweenService:Create(pill, ti, {BackgroundColor3 = state.value and T.accent or T.surface}):Play()
+        TweenService:Create(dot, ti, {Position = state.value and UDim2.new(1, -18, 0.5, -8) or UDim2.new(0, 2, 0.5, -8)}):Play()
+    end
+    render(false)
+    
+    btn.MouseEnter:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = T.surface}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.15), {Color = T.accent}):Play()
+    end)
+    btn.MouseLeave:Connect(function()
+        TweenService:Create(btn, TweenInfo.new(0.15), {BackgroundColor3 = T.element}):Play()
+        TweenService:Create(btnStroke, TweenInfo.new(0.15), {Color = T.stroke}):Play()
+    end)
+    btn.MouseButton1Click:Connect(function()
+        state.value = not state.value
+        render(true)
+        local origSize = btn.Size
+        TweenService:Create(btn, TweenInfo.new(0.08), {Size = UDim2.new(1, -4, 0, 38)}):Play()
+        task.delay(0.08, function()
+            TweenService:Create(btn, TweenInfo.new(0.15, Enum.EasingStyle.Back, Enum.EasingDirection.Out), {Size = origSize}):Play()
+        end)
+        if onChange then onChange(state.value) end
+    end)
+    toggles[text] = {state = state, render = render, pill = pill}
+    return state
+end
+
+-- ============ Slider ============
+local sliders = {}
+local function addSlider(text, order, min, max, default, onChange)
+    local frame = new("Frame", {
+        Size = UDim2.new(1, 0, 0, 56), BackgroundColor3 = T.element,
+        LayoutOrder = order, Parent = page
+    })
+    corner(frame, 8)
+    local frameStroke = stroke(frame, T.stroke, 1)
+    new("TextLabel", {
+        Size = UDim2.new(1, -90, 0, 22), Position = UDim2.new(0, 14, 0, 6),
+        BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = text,
+        TextSize = 12, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = frame
+    })
+    local valueLabel = new("TextLabel", {
+        Size = UDim2.new(0, 60, 0, 22), Position = UDim2.new(1, -74, 0, 6),
+        BackgroundTransparency = 1, Font = Enum.Font.GothamBold, Text = tostring(default),
+        TextSize = 12, TextColor3 = T.accent, TextXAlignment = Enum.TextXAlignment.Right, Parent = frame
+    })
+    local bar = new("Frame", {
+        Size = UDim2.new(1, -28, 0, 6), Position = UDim2.new(0, 14, 0, 40),
+        BackgroundColor3 = T.surface, Parent = frame
+    })
+    corner(bar, 3)
+    local fill = new("Frame", {
+        Size = UDim2.new((default - min) / (max - min), 0, 1, 0),
+        BackgroundColor3 = T.accent, BorderSizePixel = 0, Parent = bar
+    })
+    corner(fill, 3)
+    local fillGrad = grad(fill, T.accent, T.accent2, 0)
+
+    local dragging = false
+    local function setValue(px)
+        local rel = math.clamp((px - bar.AbsolutePosition.X) / bar.AbsoluteSize.X, 0, 1)
+        local val = math.floor(min + (max - min) * rel + 0.5)
+        fill.Size = UDim2.new(rel, 0, 1, 0)
+        valueLabel.Text = tostring(val)
+        if onChange then onChange(val) end
+    end
+    bar.InputBegan:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = true; setValue(i.Position.X)
+            TweenService:Create(fill, TweenInfo.new(0.1), {BackgroundColor3 = Color3.fromRGB(255,255,255)}):Play()
+        end
+    end)
+    UserInput.InputChanged:Connect(function(i)
+        if dragging and (i.UserInputType == Enum.UserInputType.MouseMovement or i.UserInputType == Enum.UserInputType.Touch) then
+            setValue(i.Position.X)
+        end
+    end)
+    UserInput.InputEnded:Connect(function(i)
+        if i.UserInputType == Enum.UserInputType.MouseButton1 or i.UserInputType == Enum.UserInputType.Touch then
+            dragging = false
+            TweenService:Create(fill, TweenInfo.new(0.2), {BackgroundColor3 = T.accent}):Play()
+        end
+    end)
+    frame.MouseEnter:Connect(function() TweenService:Create(frameStroke, TweenInfo.new(0.15), {Color = T.accent}):Play() end)
+    frame.MouseLeave:Connect(function() TweenService:Create(frameStroke, TweenInfo.new(0.15), {Color = T.stroke}):Play() end)
+    local entry = {frame = frame, fill = fill, fillGrad = fillGrad, valueLabel = valueLabel, stroke = frameStroke}
+    sliders[text] = entry
+    return entry
+end
+
+-- ============ Theme row ============
+local themeRow = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = T.element, LayoutOrder = 1, Parent = page
+})
+corner(themeRow, 8)
+local themeRowStroke = stroke(themeRow, T.stroke, 1)
+new("TextLabel", {
+    Size = UDim2.new(1, -140, 1, 0), Position = UDim2.new(0, 14, 0, 0),
+    BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = "Theme",
+    TextSize = 13, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = themeRow
+})
+local themeBtn = new("TextButton", {
+    Size = UDim2.new(0, 110, 0, 26), Position = UDim2.new(1, -122, 0.5, -13),
+    BackgroundColor3 = T.surface, Font = Enum.Font.GothamBold, Text = currentTheme,
+    TextSize = 12, TextColor3 = T.text, AutoButtonColor = false, Parent = themeRow
+})
+corner(themeBtn, 6)
+stroke(themeBtn, T.stroke, 1)
+local themeBtnGrad = grad(themeBtn, T.accent, T.accent2, 0)
+themeBtnGrad.Transparency = NumberSequence.new(0.5)
+themeRow.MouseEnter:Connect(function()
+    TweenService:Create(themeRow, TweenInfo.new(0.15), {BackgroundColor3 = T.surface}):Play()
+    TweenService:Create(themeRowStroke, TweenInfo.new(0.15), {Color = T.accent}):Play()
+end)
+themeRow.MouseLeave:Connect(function()
+    TweenService:Create(themeRow, TweenInfo.new(0.15), {BackgroundColor3 = T.element}):Play()
+    TweenService:Create(themeRowStroke, TweenInfo.new(0.15), {Color = T.stroke}):Play()
+end)
+
+-- ============ Bind row ============
+local bindRow = new("Frame", {
+    Size = UDim2.new(1, 0, 0, 40), BackgroundColor3 = T.element, LayoutOrder = 8, Parent = page
+})
+corner(bindRow, 8)
+local bindRowStroke = stroke(bindRow, T.stroke, 1)
+new("TextLabel", {
+    Size = UDim2.new(1, -140, 1, 0), Position = UDim2.new(0, 14, 0, 0),
+    BackgroundTransparency = 1, Font = Enum.Font.Gotham, Text = "Open Menu",
+    TextSize = 13, TextColor3 = T.text, TextXAlignment = Enum.TextXAlignment.Left, Parent = bindRow
+})
+local bindBtn = new("TextButton", {
+    Size = UDim2.new(0, 110, 0, 26), Position = UDim2.new(1, -122, 0.5, -13),
+    BackgroundColor3 = T.surface, Font = Enum.Font.GothamBold, Text = "RightShift",
+    TextSize = 12, TextColor3 = T.text, AutoButtonColor = false, Parent = bindRow
+})
+corner(bindBtn, 6)
+stroke(bindBtn, T.stroke, 1)
+local bindKey = Enum.KeyCode.RightShift
+bindRow.MouseEnter:Connect(function()
+    TweenService:Create(bindRow, TweenInfo.new(0.15), {BackgroundColor3 = T.surface}):Play()
+    TweenService:Create(bindRowStroke, TweenInfo.new(0.15), {Color = T.accent}):Play()
+end)
+bindRow.MouseLeave:Connect(function()
+    TweenService:Create(bindRow, TweenInfo.new(0.15), {BackgroundColor3 = T.element}):Play()
+    TweenService:Create(bindRowStroke, TweenInfo.new(0.15), {Color = T.stroke}):Play()
+end)
+
+-- ============ States ============
+local flySpeed = 60
+local tFly       = addToggle("Fly",             2, false)
+addSlider("Flight Speed", 3, 10, 300, 60, function(v) flySpeed = v end)
+
+-- ============ Theme apply ============
+local function applyTheme(name)
+    currentTheme = name
+    T = Themes[name]
+    TweenService:Create(main, TweenInfo.new(0.25), {BackgroundColor3 = T.bg}):Play()
+    TweenService:Create(header, TweenInfo.new(0.25), {BackgroundColor3 = T.surface}):Play()
+    mainStroke.Color = T.stroke
+    headerGrad.Color = ColorSequence.new(T.accent, T.accent2)
+    accentLine.BackgroundColor3 = T.accent
+    accentLineGrad.Color = ColorSequence.new(T.accent, T.accent2)
+    themeBtnGrad.Color = ColorSequence.new(T.accent, T.accent2)
+    for _, obj in pairs(page:GetChildren()) do
+        if obj:IsA("Frame") or obj:IsA("TextButton") then
+            obj.BackgroundColor3 = T.element
+            for _, st in pairs(obj:GetChildren()) do
+                if st:IsA("UIStroke") then st.Color = T.stroke end
+                if st:IsA("TextLabel") then st.TextColor3 = T.text end
+            end
+        end
+    end
+    for _, sl in pairs(sliders) do
+        sl.frame.BackgroundColor3 = T.element
+        sl.fill.BackgroundColor3 = T.accent
+        sl.fillGrad.Color = ColorSequence.new(T.accent, T.accent2)
+        sl.valueLabel.TextColor3 = T.accent
+    end
+    for _, entry in pairs(toggles) do entry.render(false) end
+    page.ScrollBarImageColor3 = T.accent
+    themeBtn.Text = name
+end
+themeBtn.MouseButton1Click:Connect(function()
+    local idx = table.find(themeOrder, currentTheme) or 1
+    idx = (idx % #themeOrder) + 1
+    applyTheme(themeOrder[idx])
+end)
+
+-- ============ Drag ============
+local dragging, dragStart, startPos
+header.InputBegan:Connect(function(input)
+    if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
+        dragging = true; dragStart = input.Position; startPos = main.Position
+        input.Changed:Connect(function()
+            if input.UserInputState == Enum.UserInputState.End then dragging = false end
+        end)
+    end
+end)
+UserInput.InputChanged:Connect(function(input)
+    if dragging and (input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch) then
+        local delta = input.Position - dragStart
+        main.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
+    end
+end)
+
+-- ============ Hotkey bind ============
+local waitingForBind = false
+bindBtn.MouseButton1Click:Connect(function()
+    waitingForBind = true
+    bindBtn.Text = "..."
+end)
+UserInput.InputBegan:Connect(function(input, processed)
+    if processed then return end
+    if waitingForBind then
+        if input.UserInputType == Enum.UserInputType.Keyboard then
+            bindKey = input.KeyCode
+            bindBtn.Text = bindKey.Name
+            waitingForBind = false
+        end
+        return
+    end
+    if input.KeyCode == bindKey then
+        if main.Visible then
+            local tw = TweenService:Create(main, TweenInfo.new(0.2, Enum.EasingStyle.Back, Enum.EasingDirection.In), { Size = UDim2.new(0, 0, 0, 0), BackgroundTransparency = 1 })
+            tw:Play()
+            tw.Completed:Connect(function() main.Visible = false end)
+        else
+            main.Visible = true
+            main.Size = UDim2.new(0, 0, 0, 0)
+            main.BackgroundTransparency = 1
+            TweenService:Create(main, TweenInfo.new(0.3, Enum.EasingStyle.Back, Enum.EasingDirection.Out), { Size = UDim2.new(0, 300, 0, 420), BackgroundTransparency = 0 }):Play()
+        end
+    end
+end)
+
+-- ============ FLY ENGINE ============
+local fly = { conn = nil, hum = nil, hrp = nil }
+
+local function stopFly()
+    if fly.conn then fly.conn:Disconnect(); fly.conn = nil end
+    if fly.hum then
+        pcall(function() fly.hum.PlatformStand = false end)
+        pcall(function() fly.hum:ChangeState(Enum.HumanoidStateType.GettingUp) end)
+        pcall(function() fly.hum.WalkSpeed = 16 end)
+    end
+    fly.hum = nil; fly.hrp = nil
+end
+
+local function startFly()
+    local char = LocalPlayer.Character
+    if not char then return end
+    fly.hrp = char:FindFirstChild("HumanoidRootPart")
+    fly.hum = char:FindFirstChildOfClass("Humanoid")
+    if not fly.hrp or not fly.hum then return end
+
+    fly.hum.PlatformStand = true
+
+    fly.conn = RunService.RenderStepped:Connect(function(dt)
+        if not fly.hrp or not fly.hrp.Parent or not fly.hum then return end
+        local cam = Workspace.CurrentCamera
+        if not cam then return end
+
+        local move = Vector3.zero
+        local fwd, right = cam.CFrame.LookVector, cam.CFrame.RightVector
+        if UserInput:IsKeyDown(Enum.KeyCode.W) then move += fwd end
+        if UserInput:IsKeyDown(Enum.KeyCode.S) then move -= fwd end
+        if UserInput:IsKeyDown(Enum.KeyCode.D) then move += right end
+        if UserInput:IsKeyDown(Enum.KeyCode.A) then move -= right end
+        if UserInput:IsKeyDown(Enum.KeyCode.Space) then move += Vector3.new(0,1,0) end
+        if UserInput:IsKeyDown(Enum.KeyCode.LeftShift) then move -= Vector3.new(0,1,0) end
+
+        local currentCFrame = fly.hrp.CFrame
+        local newPos = currentCFrame.Position
+
+        if move.Magnitude > 0 then 
+            newPos += move.Unit * flySpeed * dt 
+        end
+
+        local targetCFrame = CFrame.new(newPos, newPos + fwd)
+        fly.hrp.CFrame = fly.hrp.CFrame:Lerp(targetCFrame, 1)
+        fly.hrp.Velocity = Vector3.zero
+    end)
+end
+
+task.spawn(function()
+    local last = false
+    while gui.Parent do
+        if tFly.value ~= last then
+            last = tFly.value
+            if last then startFly() else stopFly() end
+        end
+        task.wait(0.1)
+    end
+end)
+
+LocalPlayer.CharacterAdded:Connect(function()
+    if tFly.value then
+        task.wait(0.4)
+        startFly()
+    end
+end)
+
+-- ============ Cleanup ============
+gui.Destroying:Connect(function()
+    stopFly()
+end)
